@@ -1,2 +1,131 @@
-# Netflix_Reccomendation_System
-Project Description  This project is a content-based movie recommendation system built using the Netflix Movies & TV Shows dataset (~8,800 titles). The system recommends similar movies by analyzing textual features such as plot descriptions and genre tags using Natural Language Processing techniques.  The core of the system is powered by TF-IDF (Term Frequency–Inverse Document Frequency) vectorization, which converts movie metadata into numerical feature vectors. These vectors are compared using cosine similarity to identify and rank the most similar movies for a given input title.  An interactive web-based dashboard was developed using HTML, CSS, and JavaScript, providing a user-friendly interface with the following features:  Movie selection interface Real-time recommendation engine Dynamic filtering by genre, rating, and release year Visual analytics through charts built with Chart.js  The project also includes Exploratory Data Analysis (EDA) to uncover patterns such as:  Genre distribution across the dataset Growth trends in Netflix content over time Rating distribution across titles Data quality insights, including handling of missing values  To improve recommendation performance, a custom text preprocessing pipeline was implemented, including:  Tokenization and stopword removal Feature engineering by combining genres and descriptions Vocabulary filtering to remove rare and overly common terms L2 normalization of vectors  The system computes similarity across all titles and returns Top-N recommendations with relevance scores, ensuring efficient and meaningful suggestions.  Tech Stack Frontend: HTML, CSS, JavaScript Visualization: Chart.js Machine Learning / NLP: TF-IDF, Cosine Similarity Dataset: Netflix Movies & TV Shows (Kaggle) Key Features Content-based recommendation engine Dynamic filtering (genre, rating, year) Interactive EDA dashboard Real-time similarity computation Custom TF-IDF implementation Clean and intuitive UI design Learning Outcomes Practical understanding of recommendation systems Application of NLP techniques on real-world datasets Experience in feature engineering and data preprocessing Integration of machine learning logic with frontend applications Development of an end-to-end interactive project
+# Netflix Movie Recommendation System
+
+## Project Overview  
+
+This project is a content-based movie recommendation system built using the Netflix Movies & TV Shows dataset (~8,800 titles). The system recommends movies similar to a selected title by analyzing textual features such as plot descriptions and genre tags.
+
+The goal of this project is to demonstrate how Natural Language Processing (NLP) techniques can be applied to build an intelligent recommendation engine and integrate it with an interactive user interface.
+
+---
+
+## Problem Statement  
+
+With the rapid growth of streaming platforms, users often face difficulty in discovering relevant content. This project addresses the problem by building a recommendation system that suggests movies based on content similarity rather than user history.
+
+---
+
+## Dataset  
+
+- Source: Kaggle Netflix Movies & TV Shows Dataset  
+- Total Titles: 8,807  
+- Features Used:
+  - Title  
+  - Description  
+  - Genre (listed_in)  
+  - Rating  
+  - Release Year  
+
+---
+
+## Approach  
+
+### 1. Data Preprocessing  
+- Handled missing values  
+- Removed duplicates  
+- Standardized genre formats  
+- Combined genres and descriptions into a single text feature ("soup")  
+
+### 2. Feature Engineering  
+- Tokenization and stopword removal  
+- Removal of rare and overly frequent terms  
+- Creation of a unified textual representation  
+
+### 3. Vectorization (TF-IDF)  
+- Converted text into numerical vectors using TF-IDF  
+- Captured importance of words relative to the dataset  
+
+### 4. Similarity Computation  
+- Used cosine similarity to compute similarity between movies  
+- Built a similarity matrix across all titles  
+
+### 5. Recommendation System  
+- Given a movie, returns Top-N most similar titles  
+- Supports filtering by:
+  - Genre  
+  - Rating  
+  - Release Year  
+
+---
+
+## Features  
+
+- Content-based recommendation engine  
+- Real-time movie recommendations  
+- Interactive filtering options  
+- Clean and responsive UI  
+- Integrated EDA visualizations  
+
+---
+
+## Exploratory Data Analysis (EDA)  
+
+Key insights derived from the dataset:
+
+- International Movies and Dramas dominate the catalog  
+- Rapid content growth observed between 2015–2018  
+- Majority of content falls under TV-MA and TV-14 ratings  
+- Minimal missing values in key features used for modeling  
+
+---
+
+## Tech Stack  
+
+- **Frontend:** HTML, CSS, JavaScript  
+- **Visualization:** Chart.js  
+- **Backend Logic:** Python (Google Colab)  
+- **Machine Learning / NLP:**  
+  - TF-IDF Vectorization  
+  - Cosine Similarity  
+
+---
+
+## How It Works  
+
+1. User selects a movie  
+2. System retrieves its TF-IDF vector  
+3. Cosine similarity is computed against all other movies  
+4. Top-N similar movies are ranked and displayed  
+5. Filters refine the results based on user preference  
+
+---
+
+## Project Structure  
+├── notebook.ipynb # Main ML model and preprocessing
+├── index.html # Frontend UI
+├── README.md # Project documentation
+
+
+---
+
+## Future Improvements  
+
+- Hybrid recommendation system (content + collaborative filtering)  
+- Integration with real-time APIs  
+- Deployment using Flask or FastAPI  
+- Personalized recommendations based on user history  
+
+---
+
+## Learning Outcomes  
+
+- Built a recommendation system from scratch  
+- Applied NLP techniques on real-world data  
+- Understood TF-IDF and cosine similarity in depth  
+- Gained experience in data preprocessing and feature engineering  
+- Developed an end-to-end data science project with UI integration  
+
+---
+
+## Conclusion  
+
+This project demonstrates how machine learning and NLP techniques can be used to build scalable recommendation systems. By combining data analysis, feature engineering, and interactive visualization, the system provides meaningful and efficient movie recommendations.
