@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Netflix Movie Recommendation System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --red: #E50914;
+    --dark: #141414;
+    --card: #1f1f1f;
+    --card2: #2a2a2a;
+    --border: rgba(255,255,255,0.1);
+    --text: #e5e5e5;
+    --muted: #999;
+    --accent: #E50914;
+    --gold: #f5c518;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: var(--text); font-family: 'Helvetica Neue', Arial, sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  header { background: linear-gradient(180deg, #000 0%, rgba(0,0,0,0.7) 100%); padding: 0 40px; display: flex; align-items: center; justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+  .logo { color: var(--red); font-size: 24px; font-weight: 900; letter-spacing: -1px; }
+  .logo span { color: #fff; font-size: 13px; font-weight: 400; margin-left: 10px; opacity: 0.7; }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: none; color: var(--muted); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  nav button.active { background: var(--red); color: #fff; }
+  nav button:hover:not(.active) { background: rgba(255,255,255,0.08); color: #fff; }
+
+  /* LAYOUT */
+  .page { display: none; padding: 32px 40px; max-width: 1200px; margin: 0 auto; }
+  .page.active { display: block; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+  p.sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+
+  /* STAT CARDS */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 32px; font-weight: 700; color: #fff; }
+  .stat-card .tag { font-size: 12px; color: var(--red); margin-top: 4px; }
+
+  /* CHARTS */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .chart-card .hint { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* PIPELINE STEPS */
+  .pipeline { display: flex; gap: 0; margin-bottom: 32px; }
+  .step { flex: 1; position: relative; }
+  .step-inner { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-right: 24px; }
+  .step:last-child .step-inner { margin-right: 0; }
+  .step-num { width: 28px; height: 28px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .step-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .step-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .step::after { content: '→'; position: absolute; right: -4px; top: 50%; transform: translateY(-50%); color: var(--red); font-size: 18px; font-weight: 700; }
+  .step:last-child::after { display: none; }
+
+  /* RECOMMENDER */
+  .search-bar { display: flex; gap: 12px; margin-bottom: 24px; }
+  .search-bar select, .search-bar input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: var(--radius); font-size: 14px; flex: 1; }
+  .search-bar select option { background: #1f1f1f; }
+  .search-bar button { background: var(--red); border: none; color: #fff; padding: 10px 22px; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.2s; }
+  .search-bar button:hover { opacity: 0.85; }
+
+  .filters { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .filters select { background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 20px; font-size: 12px; }
+
+  .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .movie-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: border-color 0.2s, transform 0.2s; cursor: pointer; }
+  .movie-card:hover { border-color: var(--red); transform: translateY(-2px); }
+  .movie-card .rank { font-size: 11px; color: var(--red); font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .movie-card .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+  .movie-card .meta { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .movie-card .desc { font-size: 11px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .movie-card .genres { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .movie-card .genre-tag { font-size: 10px; background: rgba(229,9,20,0.15); color: var(--red); padding: 2px 7px; border-radius: 10px; }
+  .movie-card .score { font-size: 12px; color: var(--gold); font-weight: 600; margin-top: 8px; }
+
+  .selected-movie { background: var(--card2); border: 1px solid var(--red); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+  .selected-movie h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .selected-movie .meta { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .selected-movie .desc { font-size: 13px; line-height: 1.6; color: var(--text); }
+
+  /* EDA */
+  .eda-section { margin-bottom: 36px; }
+  .insight-box { background: var(--card); border-left: 3px solid var(--red); border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin-top: 16px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .insight-box strong { color: var(--text); }
+
+  /* CODE */
+  .code-block { background: #0d0d0d; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.7; overflow-x: auto; margin-bottom: 20px; }
+  .code-block .comment { color: #6a9955; }
+  .code-block .keyword { color: #569cd6; }
+  .code-block .string { color: #ce9178; }
+  .code-block .func { color: #dcdcaa; }
+  .code-block .num { color: #b5cea8; }
+  .step-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .step-tab { background: var(--card2); border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .step-tab.active { background: var(--red); color: #fff; border-color: var(--red); }
+  .code-panel { display: none; }
+  .code-panel.active { display: block; }
+
+  /* EMPTY / LOADING */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .badge { display: inline-block; background: rgba(229,9,20,0.15); color: var(--red); border: 1px solid rgba(229,9,20,0.3); border-radius: 12px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .pipeline { flex-direction: column; }
+    .step::after { display: none; }
+    .step-inner { margin-right: 0; margin-bottom: 12px; }
+    header { padding: 0 16px; }
+    .page { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NETFLIX<span>Recommendation System </span></div>
+  <nav>
+    <button class="active" onclick="showPage('overview')">Overview</button>
+    <button onclick="showPage('eda')">EDA</button>
+    <button onclick="showPage('recommender')">Recommender</button>
+  </nav>
+</header>
+
+<!-- PAGE: OVERVIEW -->
+<div class="page active" id="overview">
+  <h1>Netflix Movie Recommendation System</h1>
+  <p class="sub">A content-based filtering system built on 8,807 Netflix titles using TF-IDF vectorization and cosine similarity. Developed using the Kaggle Netflix Movies & TV Shows dataset.</p>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="label">Total Titles</div>
+      <div class="value">8,807</div>
+      <div class="tag">Netflix dataset</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Movies</div>
+      <div class="value">6,131</div>
+      <div class="tag">69.6% of catalog</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">TV Shows</div>
+      <div class="value">2,676</div>
+      <div class="tag">30.4% of catalog</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Year Range</div>
+      <div class="value">1925–2021</div>
+      <div class="tag">96 years of content</div>
+    </div>
+  </div>
+
+  <h2>Project Pipeline</h2>
+  <div class="pipeline">
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">1</div>
+        <div class="step-title">Data Collection</div>
+        <div class="step-desc">Import 8,807 Netflix titles with 12 features each from CSV</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">2</div>
+        <div class="step-title">Data Cleaning</div>
+        <div class="step-desc">Handle nulls, remove duplicates, standardize genres</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">3</div>
+        <div class="step-title">EDA</div>
+        <div class="step-desc">Bar charts, genre distribution, rating vs year trends</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">4</div>
+        <div class="step-title">TF-IDF</div>
+        <div class="step-desc">Vectorize descriptions + genres into numerical matrix</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">5</div>
+        <div class="step-title">Cosine Similarity</div>
+        <div class="step-desc">Build n×n similarity matrix across all movies</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-inner">
+        <div class="step-num">6</div>
+        <div class="step-title">Recommend</div>
+        <div class="step-desc">Return top-N most similar movies for any title</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Content Type Split</h3>
+      <div class="hint">Movies vs TV Shows in the dataset</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="typeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Titles Added Per Year</h3>
+      <div class="hint">Content added 2010–2021</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="yearChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top 8 Ratings</h3>
+      <div class="hint">Content rating distribution</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="ratingChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top 10 Genres</h3>
+      <div class="hint">Most common genre tags</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="genreChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: EDA -->
+<div class="page" id="eda">
+  <h1>Exploratory Data Analysis</h1>
+  <p class="sub">Deep dive into the Netflix dataset — understanding genre distribution, content trends, and rating patterns before building the recommendation engine.</p>
+
+  <div class="eda-section">
+    <h2>Genre Distribution</h2>
+    <div class="chart-card">
+      <h3>All Genre Tags (Top 15)</h3>
+      <div class="hint">Each movie can have multiple genre tags</div>
+      <div class="chart-wrap" style="height:340px"><canvas id="edaGenreChart"></canvas></div>
+    </div>
+    <div class="insight-box">
+      <strong>Key finding:</strong> "International Movies" is the single largest genre tag (2,752 titles), overtaking even "Dramas" (2,427). This tells us Netflix's catalog is heavily globalized. Comedies (1,674) rank third, making Comedy + Drama the dominant content combo. For our recommender, genre weighting matters — a movie tagged as "International" alone carries less discriminative power than "Thrillers" or "Sci-Fi & Fantasy".
+    </div>
+  </div>
+
+  <div class="eda-section">
+    <h2>Content Trend (2010–2021)</h2>
+    <div class="chart-card">
+      <h3>Netflix Content Growth</h3>
+      <div class="hint">Number of titles released each year (2010–2021)</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="edaYearChart"></canvas></div>
+    </div>
+    <div class="insight-box">
+      <strong>Key finding:</strong> Netflix experienced explosive content growth from 2015–2018, peaking at <strong>1,147 titles in 2018</strong>. Content dropped slightly in 2019–2020 (likely due to production delays from COVID-19), then dropped further in 2021 as the dataset captures only part of that year. For the recommender, newer titles (post-2015) dominate the corpus, so similarity scores will naturally skew toward recent content.
+    </div>
+  </div>
+
+  <div class="eda-section">
+    <h2>Rating Analysis</h2>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Rating Distribution</h3>
+        <div class="hint">TV-MA and TV-14 dominate</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="edaRatingChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Movies vs TV — Rating Comparison</h3>
+        <div class="hint">How ratings differ by content type</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="edaRatingTypeChart"></canvas></div>
+      </div>
+    </div>
+    <div class="insight-box">
+      <strong>Key finding:</strong> <strong>TV-MA</strong> (adult/mature) is the most common rating at 3,207 titles (36.4%), followed by TV-14 at 2,160. This reveals Netflix caters primarily to adult audiences. For a personalized recommender, rating should be a filter option — family users need PG/TV-PG content, while mature audiences can explore the full catalog. Our system includes this as a live filter.
+    </div>
+  </div>
+
+  <div class="eda-section">
+    <h2>Data Quality Assessment</h2>
+    <div class="chart-card">
+      <h3>Missing Values Per Column</h3>
+      <div class="hint">Null counts across the 12 dataset features</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="edaNullChart"></canvas></div>
+    </div>
+    <div class="insight-box">
+      <strong>Key finding:</strong> <strong>Director</strong> has the most missing values (~2,634 rows), followed by <strong>cast</strong> (~825 rows) and <strong>country</strong> (~831 rows). For the TF-IDF vectorizer, we rely on <strong>description</strong> and <strong>listed_in</strong> (genres) — both have near-zero nulls, making them the ideal features for our content-based engine. Missing director/cast are replaced with empty strings before vectorization.
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: RECOMMENDER -->
+<div class="page" id="recommender">
+  <h1>Live Recommendation Engine</h1>
+  <p class="sub">Select any movie from the dataset to get personalized recommendations powered by TF-IDF + cosine similarity. The engine analyzes plot descriptions and genre tags to find the most similar titles.</p>
+
+  <div class="search-bar">
+    <select id="movieSelect">
+      <option value="">— Select a movie —</option>
+    </select>
+    <button onclick="recommend()">Get Recommendations ↗</button>
+  </div>
+
+  <div class="filters">
+    <label style="font-size:12px;color:var(--muted);align-self:center">Filters:</label>
+    <select id="filterRating" onchange="applyFilters()">
+      <option value="">All Ratings</option>
+      <option value="TV-MA">TV-MA</option>
+      <option value="TV-14">TV-14</option>
+      <option value="PG-13">PG-13</option>
+      <option value="PG">PG</option>
+      <option value="R">R</option>
+      <option value="TV-PG">TV-PG</option>
+    </select>
+    <select id="filterGenre" onchange="applyFilters()">
+      <option value="">All Genres</option>
+    </select>
+    <select id="filterYear" onchange="applyFilters()">
+      <option value="">All Years</option>
+      <option value="2015">2015+</option>
+      <option value="2010">2010+</option>
+      <option value="2000">2000+</option>
+      <option value="1990">1990+</option>
+    </select>
+    <select id="filterN" onchange="applyFilters()">
+      <option value="6">Top 6</option>
+      <option value="9">Top 9</option>
+      <option value="12" selected>Top 12</option>
+    </select>
+  </div>
+
+  <div id="selectedInfo" style="display:none"></div>
+
+  <div id="resultsArea">
+    <div class="empty">
+      <div class="icon">🎬</div>
+      <div style="font-size:15px;margin-bottom:6px">Pick a movie to get started</div>
+      <div style="font-size:13px">The engine will find the most similar titles using TF-IDF cosine similarity</div>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────
+const MOVIES = [{"id":"s1","title":"Dick Johnson Is Dead","director":"Kirsten Johnson","country":"United States","year":2020,"rating":"PG-13","duration":"90 min","genres":["Documentaries"],"description":"As her father nears the end of his life, filmmaker Kirsten Johnson stages his death in inventive and comical ways to help them both face the inevitable."},{"id":"s7","title":"My Little Pony: A New Generation","director":"Robert Cullen, José Luis Ucha","country":"Unknown","year":2021,"rating":"PG","duration":"91 min","genres":["Children & Family Movies"],"description":"Equestria's divided. But a bright-eyed hero believes Earth Ponies, Pegasi and Unicorns should be pals — and, hoof to heart, she's determined to prove it."},{"id":"s8","title":"Sankofa","director":"Haile Gerima","country":"United States","year":1993,"rating":"TV-MA","duration":"125 min","genres":["Dramas","Independent Movies","International Movies"],"description":"On a photo shoot in Ghana, an American model slips back in time, becomes enslaved on a plantation and bears witness to the agony of her ancestral past."},{"id":"s10","title":"The Starling","director":"Theodore Melfi","country":"United States","year":2021,"rating":"PG-13","duration":"104 min","genres":["Comedies","Dramas"],"description":"A woman adjusting to life after a loss contends with a feisty bird that's taken over her garden — and a husband who's struggling to find a way forward."},{"id":"s13","title":"Je Suis Karl","director":"Christian Schwochow","country":"Germany","year":2021,"rating":"TV-MA","duration":"127 min","genres":["Dramas","International Movies"],"description":"After most of her family is murdered in a terrorist bombing, a young woman is unknowingly lured into joining the very group that killed them."},{"id":"s17","title":"Europe's Most Dangerous Man: Otto Skorzeny in Spain","director":"Pedro de Echave García","country":"Unknown","year":2020,"rating":"TV-MA","duration":"67 min","genres":["Documentaries","International Movies"],"description":"Declassified documents reveal the post-WWII life of Otto Skorzeny, a close Hitler ally who escaped to Spain and became an adviser to world presidents."},{"id":"s19","title":"Intrusion","director":"Adam Salky","country":"Unknown","year":2021,"rating":"TV-14","duration":"94 min","genres":["Thrillers"],"description":"After a deadly home invasion at a couple's new dream house, the traumatized wife searches for answers — and learns the real danger is just beginning."},{"id":"s28","title":"Grown Ups","director":"Dennis Dugan","country":"United States","year":2010,"rating":"PG-13","duration":"103 min","genres":["Comedies"],"description":"Mourning the loss of their beloved junior high basketball coach, five middle-aged pals reunite at a lake house and rediscover the joys of being a kid."},{"id":"s29","title":"Dark Skies","director":"Scott Stewart","country":"United States","year":2013,"rating":"PG-13","duration":"97 min","genres":["Horror Movies","Sci-Fi & Fantasy"],"description":"A family's idyllic suburban life shatters when an alien force invades their home, and as they struggle to convince others of the deadly threat."},{"id":"s30","title":"Paranoia","director":"Robert Luketic","country":"United States","year":2013,"rating":"PG-13","duration":"106 min","genres":["Thrillers"],"description":"Blackmailed by his company's CEO, a low-level employee finds himself forced to spy on the boss's rival and former mentor."},{"id":"s36","title":"The Father Who Moves Mountains","director":"Daniel Sandu","country":"Unknown","year":2021,"rating":"TV-MA","duration":"110 min","genres":["Dramas","International Movies","Thrillers"],"description":"When his son goes missing during a snowy hike in the mountains, a retired intelligence officer will stop at nothing — and risk everything — to find him."},{"id":"s37","title":"The Stronghold","director":"Cédric Jimenez","country":"Unknown","year":2021,"rating":"TV-MA","duration":"105 min","genres":["Action & Adventure","Dramas","International Movies"],"description":"Tired of the small-time grind, three Marseille cops get a chance to bust a major drug network. But lines blur when a key informant makes a big ask."},{"id":"s39","title":"Birth of the Dragon","director":"George Nolfi","country":"China","year":2017,"rating":"PG-13","duration":"96 min","genres":["Action & Adventure","Dramas"],"description":"A young Bruce Lee angers kung fu traditionalists by teaching outsiders, leading to a showdown with a Shaolin master in this film based on real events."},{"id":"s42","title":"Jaws","director":"Steven Spielberg","country":"United States","year":1975,"rating":"PG","duration":"124 min","genres":["Action & Adventure","Classic Movies","Dramas"],"description":"When an insatiable great white shark terrorizes Amity Island, a police chief, an oceanographer and a grizzled shark hunter seek to destroy the beast."},{"id":"s43","title":"Jaws 2","director":"Jeannot Szwarc","country":"United States","year":1978,"rating":"PG","duration":"116 min","genres":["Dramas","Horror Movies","Thrillers"],"description":"Four years after the last deadly shark attacks, police chief Martin Brody fights to protect Amity Island from another killer great white."},{"id":"s44","title":"Jaws 3","director":"Joe Alves","country":"United States","year":1983,"rating":"PG","duration":"98 min","genres":["Action & Adventure","Horror Movies","Thrillers"],"description":"After the staff of a marine theme park try to capture a young great white shark, they discover its mother has invaded the enclosure and is out for blood."},{"id":"s45","title":"Jaws: The Revenge","director":"Joseph Sargent","country":"United States","year":1987,"rating":"PG-13","duration":"91 min","genres":["Action & Adventure","Horror Movies","Thrillers"],"description":"After another deadly shark attack, Ellen Brody has had enough of Amity Island and moves to the Caribbean – but a great white shark follows her there."},{"id":"s47","title":"Safe House","director":"Daniel Espinosa","country":"South Africa","year":2012,"rating":"R","duration":"115 min","genres":["Action & Adventure"],"description":"Young CIA operative Matt Weston must get a dangerous criminal out of an agency safe house that's come under attack and get him to a securer location."},{"id":"s49","title":"Training Day","director":"Antoine Fuqua","country":"United States","year":2001,"rating":"R","duration":"122 min","genres":["Dramas","Thrillers"],"description":"A rookie cop with one day to prove himself to a veteran LAPD narcotics officer receives a crash course in his mentor's questionable brand of justice."},{"id":"s52","title":"InuYasha the Movie 2: The Castle Beyond the Looking Glass","director":"Toshiya Shinohara","country":"Japan","year":2002,"rating":"TV-14","duration":"99 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"With their biggest foe seemingly defeated, InuYasha and his friends return to everyday life. But the peace is soon shattered by an emerging new enemy."},{"id":"s53","title":"InuYasha the Movie 3: Swords of an Honorable Ruler","director":"Toshiya Shinohara","country":"Japan","year":2003,"rating":"TV-14","duration":"99 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"The Great Dog Demon beaqueathed one of the Three Swords of the Fang to each of his two sons. Now the evil power of the third sword has been awakened."},{"id":"s54","title":"InuYasha the Movie 4: Fire on the Mystic Island","director":"Toshiya Shinohara","country":"Japan","year":2004,"rating":"TV-PG","duration":"88 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"Ai, a young half-demon who has escaped from Horai Island to try to help her people, returns with potential saviors InuYasha, Sesshomaru and Kikyo."},{"id":"s55","title":"InuYasha the Movie: Affections Touching Across Time","director":"Toshiya Shinohara","country":"Japan","year":2001,"rating":"TV-PG","duration":"100 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"A powerful demon has been sealed away for 200 years. But when the demon's son is awakened, the fate of the world is in jeopardy."},{"id":"s57","title":"Naruto Shippuden the Movie: Blood Prison","director":"Masahiko Murata","country":"Japan","year":2011,"rating":"TV-14","duration":"102 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"Mistakenly accused of an attack on the Fourth Raikage, ninja Naruto is imprisoned in the impenetrable Hozuki Castle and his powers are sealed."},{"id":"s58","title":"Naruto Shippûden the Movie: Bonds","director":"Hajime Kamegaki","country":"Japan","year":2008,"rating":"TV-PG","duration":"93 min","genres":["Action & Adventure","Anime Features","International Movies"],"description":"When strange ninjas ambush the village of Konohagakure, it's up to adolescent ninja Naruto and his long-missing pal, Sasuke, to save the planet."},{"id":"s65","title":"Nightbooks","director":"David Yarovesky","country":"Unknown","year":2021,"rating":"TV-PG","duration":"103 min","genres":["Children & Family Movies"],"description":"Scary story fan Alex must tell a spine-tingling tale every night — or stay trapped with his new friend in a wicked witch's magical apartment forever."},{"id":"s69","title":"Schumacher","director":"Hanns-Bruno Kammertöns","country":"Unknown","year":2021,"rating":"TV-14","duration":"113 min","genres":["Documentaries","International Movies","Sports Movies"],"description":"Through exclusive interviews and archival footage, this documentary traces an intimate portrait of seven-time Formula 1 champion Michael Schumacher."},{"id":"s74","title":"King of Boys","director":"Kemi Adetiba","country":"Nigeria","year":2018,"rating":"TV-MA","duration":"182 min","genres":["Dramas","International Movies"],"description":"When a powerful businesswoman's political ambitions are threatened by her underworld connections, the ensuing power struggle could cost her everything."},{"id":"s82","title":"Kate","director":"Cedric Nicolas-Troyan","country":"United States","year":2021,"rating":"R","duration":"106 min","genres":["Action & Adventure"],"description":"Slipped a fatal poison on her final job, a ruthless assassin working in Tokyo has less than 24 hours to find out who ordered the hit and exact revenge."},{"id":"s87","title":"Prey","director":"Thomas Sieben","country":"Unknown","year":2021,"rating":"TV-MA","duration":"87 min","genres":["International Movies","Thrillers"],"description":"A hiking trip into the wild turns into a desperate bid for survival for five friends on the run from a mysterious shooter."},{"id":"s89","title":"Blood Brothers: Malcolm X & Muhammad Ali","director":"Marcus Clarke","country":"Unknown","year":2021,"rating":"PG-13","duration":"96 min","genres":["Documentaries","Sports Movies"],"description":"From a chance meeting to a tragic fallout, Malcolm X and Muhammad Ali's extraordinary bond cracks under the weight of distrust and shifting ideals."},{"id":"s91","title":"Paradise Hills","director":"Alice Waddington","country":"Spain","year":2019,"rating":"TV-MA","duration":"95 min","genres":["Sci-Fi & Fantasy","Thrillers"],"description":"Uma wakes up in a lush tropical facility designed to turn willful girls into perfect ladies. That's bad enough, but its real purpose is even worse."},{"id":"s97","title":"If I Leave Here Tomorrow: A Film About Lynyrd Skynyrd","director":"Stephen Kijak","country":"United States","year":2018,"rating":"TV-MA","duration":"97 min","genres":["Documentaries","Music & Musicals"],"description":"Using interviews and archival footage, this documentary charts the story of the legendary Southern rockers with a focus on front man Ronnie Van Zant."},{"id":"s102","title":"Untold: Breaking Point","director":"Chapman Way","country":"United States","year":2021,"rating":"TV-MA","duration":"80 min","genres":["Documentaries","Sports Movies"],"description":"Under pressure to continue a winning tradition in American tennis, Mardy Fish faced mental health challenges that changed his life on and off the court."},{"id":"s106","title":"Angamaly Diaries","director":"Lijo Jose Pellissery","country":"India","year":2017,"rating":"TV-14","duration":"128 min","genres":["Action & Adventure","Comedies","Dramas"],"description":"After growing up amidst the gang wars of his hometown, Vincent forms an entrepreneurial squad of his own and ends up on the wrong side of the law."},{"id":"s108","title":"A Champion Heart","director":"David de Vos","country":"United States","year":2018,"rating":"G","duration":"90 min","genres":["Children & Family Movies","Dramas"],"description":"When a grieving teen must work off her debt to a ranch, she cares for a wounded horse that teaches her more about healing than she expected."},{"id":"s113","title":"Worth","director":"Sara Colangelo","country":"Unknown","year":2021,"rating":"PG-13","duration":"119 min","genres":["Dramas"],"description":"In the wake of the Sept. 11 attacks, a lawyer faces an emotional reckoning as he attempts to put a dollar value on the lives lost. Based on real events."},{"id":"s114","title":"Afterlife of the Party","director":"Stephen Herek","country":"Unknown","year":2021,"rating":"TV-PG","duration":"110 min","genres":["Comedies","Romantic Movies"],"description":"Cassie lives to party... until she dies in a freak accident. Now this social butterfly needs to right her wrongs on Earth if she wants to earn her wings."},{"id":"s115","title":"Anjaam","director":"Rahul Rawail","country":"India","year":1994,"rating":"TV-14","duration":"143 min","genres":["Dramas","International Movies","Thrillers"],"description":"A wealthy industrialist's dangerous obsession with a flight attendant destroys her world, until she takes matters into her own hands to exact revenge."},{"id":"s116","title":"Bright Star","director":"Jane Campion","country":"United Kingdom","year":2009,"rating":"PG","duration":"119 min","genres":["Dramas","Romantic Movies"],"description":"This drama details the passionate three-year romance between Romantic poet John Keats – who died tragically at age 25 – and his great love and muse."},{"id":"s117","title":"Dhanak","director":"Nagesh Kukunoor","country":"India","year":2015,"rating":"TV-PG","duration":"114 min","genres":["Comedies","Dramas","Independent Movies"],"description":"A movie-loving 10-year-old and her blind little brother trek to meet Indian superstar Shah Rukh Khan for help in getting the boy an eye operation."},{"id":"s118","title":"Final Account","director":"Luke Holland","country":"United Kingdom","year":2021,"rating":"PG-13","duration":"94 min","genres":["Documentaries"],"description":"This documentary stitches together never-before-seen interviews with the last living generation of people who participated in Hitler's Third Reich."},{"id":"s119","title":"Gurgaon","director":"Shanker Raman","country":"India","year":2017,"rating":"TV-14","duration":"106 min","genres":["Dramas","International Movies","Thrillers"],"description":"When the daughter of a wealthy family returns from college, she gets a frosty welcome from her brother, who has problems – and plans – of his own."},{"id":"s123","title":"In the Cut","director":"Jane Campion","country":"United Kingdom","year":2003,"rating":"R","duration":"118 min","genres":["Thrillers"],"description":"After embarking on an affair with the cop probing the murder of a young woman, an insular schoolteacher suspects her lover was involved in the crime."},{"id":"s128","title":"A Cinderella Story","director":"Mark Rosman","country":"United States","year":2004,"rating":"PG","duration":"95 min","genres":["Children & Family Movies","Comedies"],"description":"Teen Sam meets the boy of her dreams at a dance before returning to toil in her stepmother's diner. Can her lost cell phone bring them together?"},{"id":"s129","title":"Agatha Christie's Crooked House","director":"Gilles Paquet-Brenner","country":"Unknown","year":2017,"rating":"PG-13","duration":"115 min","genres":["Dramas","International Movies","Thrillers"],"description":"When a detective investigates the death of his ex-lover's grandfather, he uncovers secrets about the tycoon's manipulative family."},{"id":"s130","title":"An Unfinished Life","director":"Lasse Hallström","country":"Germany","year":2005,"rating":"PG-13","duration":"108 min","genres":["Dramas"],"description":"A grieving widow and her daughter move in with her estranged father-in-law in Wyoming, where time allows them to heal and forgive."},{"id":"s132","title":"Blade Runner: The Final Cut","director":"Ridley Scott","country":"United States","year":1982,"rating":"R","duration":"117 min","genres":["Action & Adventure","Classic Movies","Cult Movies"],"description":"In a smog-choked dystopian Los Angeles, blade runner Rick Deckard is called out of retirement to snuff a quartet of escaped \"replicants.\""},{"id":"s134","title":"Chappie","director":"Neill Blomkamp","country":"South Africa","year":2015,"rating":"R","duration":"121 min","genres":["Action & Adventure","Sci-Fi & Fantasy"],"description":"In a futuristic society where an indestructible robot police force keeps crime at bay, a lone droid evolves to the next level of artificial intelligence."},{"id":"s135","title":"Clear and Present Danger","director":"Phillip Noyce","country":"United States","year":1994,"rating":"PG-13","duration":"142 min","genres":["Action & Adventure","Dramas"],"description":"When the president's friend is murdered, CIA Deputy Director Jack Ryan becomes unwittingly involved in an illegal war against a Colombian drug cartel."},{"id":"s136","title":"Cliffhanger","director":"Renny Harlin","country":"United States","year":1993,"rating":"R","duration":"113 min","genres":["Action & Adventure"],"description":"Ranger Gabe Walker and his partner are called to rescue a group of stranded climbers, only to learn the climbers are actually thieving hijackers."},{"id":"s137","title":"Cold Mountain","director":"Anthony Minghella","country":"United States","year":2003,"rating":"R","duration":"154 min","genres":["Dramas","Romantic Movies"],"description":"This drama follows a wounded Civil War soldier making the long journey home, while his faraway love fights for survival on her deceased father's farm."},{"id":"s138","title":"Crocodile Dundee in Los Angeles","director":"Simon Wincer","country":"Australia","year":2001,"rating":"PG","duration":"95 min","genres":["Action & Adventure","Comedies"],"description":"When Mick Crocodile Dundee and his family land in Los Angeles, they soon learn some lessons about American life in this comedy sequel."},{"id":"s139","title":"Dear John","director":"Lasse Hallström","country":"United States","year":2010,"rating":"PG-13","duration":"108 min","genres":["Dramas","Romantic Movies"],"description":"While on summer leave, a U.S. soldier falls for a college student. But when he's forced to reenlist, their handwritten letters hold the lovers together."},{"id":"s140","title":"Do the Right Thing","director":"Spike Lee","country":"United States","year":1989,"rating":"R","duration":"120 min","genres":["Classic Movies","Comedies","Dramas"],"description":"On a sweltering day in Brooklyn, simmering racial tensions between residents rise to the surface and ignite rage, violence and tragedy."},{"id":"s142","title":"Extraction","director":"Steven C. Miller","country":"United States","year":2015,"rating":"R","duration":"82 min","genres":["Action & Adventure"],"description":"When a retired CIA agent is kidnapped, his son, a government analyst, embarks on an unauthorized mission to find him and halt a terrorist plot."},{"id":"s143","title":"Freedom Writers","director":"Richard LaGravenese","country":"Germany","year":2007,"rating":"PG-13","duration":"124 min","genres":["Dramas"],"description":"While her at-risk students are reading classics, a teacher asks them to keep journals about their troubled lives."},{"id":"s144","title":"Green Lantern","director":"Martin Campbell","country":"United States","year":2011,"rating":"PG-13","duration":"114 min","genres":["Action & Adventure","Sci-Fi & Fantasy"],"description":"Test pilot Hal Jordan harnesses glowing new powers for good when he wears an otherworldly ring and helps an intergalactic force stop a powerful threat."},{"id":"s145","title":"House Party","director":"Reginald Hudlin","country":"United States","year":1990,"rating":"R","duration":"104 min","genres":["Comedies","Cult Movies"],"description":"Grounded by his strict father, Kid risks life and limb to go to his best friend Play's big bash but experiences one obstacle after another."},{"id":"s150","title":"I Got the Hook Up","director":"Michael Martin","country":"United States","year":1998,"rating":"R","duration":"93 min","genres":["Action & Adventure","Comedies"],"description":"After getting their hands on a misdirected shipment of cell phones, two hustlers try to cash in by hawking the merchandise from the back of their van."},{"id":"s151","title":"In Too Deep","director":"Michael Rymer","country":"United States","year":1999,"rating":"R","duration":"97 min","genres":["Thrillers"],"description":"Rookie cop Jeffrey Cole poses as a drug dealer to take down a crime lord and soon gets caught up in an underworld of bribery, intimidation and murder."},{"id":"s156","title":"Labyrinth","director":"Jim Henson","country":"United Kingdom","year":1986,"rating":"PG","duration":"101 min","genres":["Action & Adventure","Children & Family Movies","Cult Movies"],"description":"In Jim Henson's fantasy, teen Sarah embarks on a life-altering quest to rescue her little brother from the clutches of a treacherous goblin."},{"id":"s157","title":"Letters to Juliet","director":"Gary Winick","country":"United States","year":2010,"rating":"PG","duration":"105 min","genres":["Comedies","Dramas","Romantic Movies"],"description":"By responding to a letter addressed to Shakespeare's tragic heroine Juliet Capulet, an American woman in Verona, Italy, is led in search of romance."},{"id":"s158","title":"Level 16","director":"Danishka Esterhazy","country":"Canada","year":2018,"rating":"TV-14","duration":"102 min","genres":["Sci-Fi & Fantasy","Thrillers"],"description":"In a bleak academy that teaches girls the virtues of passivity, two students uncover the ghastly purpose behind their training and resolve to escape."},{"id":"s159","title":"Love Don't Cost a Thing","director":"Troy Byer","country":"United States","year":2003,"rating":"PG-13","duration":"101 min","genres":["Comedies","Romantic Movies"],"description":"A nerdy teen tries to make himself cool by association when he convinces a popular cheerleader to pose as his girlfriend."},{"id":"s162","title":"Mars Attacks!","director":"Tim Burton","country":"United States","year":1996,"rating":"PG-13","duration":"106 min","genres":["Comedies","Cult Movies","Sci-Fi & Fantasy"],"description":"As flying saucers head for Earth, the president of the United States prepares to welcome alien visitors but soon learns they're not coming in peace."},{"id":"s163","title":"Marshall","director":"Reginald Hudlin","country":"United States","year":2017,"rating":"PG-13","duration":"118 min","genres":["Dramas"],"description":"This biopic of Thurgood Marshall, the first Black U.S. Supreme Court justice, centers on his pivotal work in a sensational case as an NAACP lawyer."},{"id":"s165","title":"Mystery Men","director":"Kinka Usher","country":"United States","year":1999,"rating":"PG-13","duration":"121 min","genres":["Action & Adventure","Comedies"],"description":"A team of far-from-super heroes try to earn respect by springing into action when brave and dashing Captain Amazing disappears."},{"id":"s167","title":"Once Upon a Time in America","director":"Sergio Leone","country":"Italy","year":1984,"rating":"R","duration":"229 min","genres":["Classic Movies","Dramas"],"description":"Director Sergio Leone's sprawling crime epic follows a group of Jewish mobsters who rise in the ranks of organized crime in 1920s New York City."},{"id":"s170","title":"Poseidon","director":"Wolfgang Petersen","country":"United States","year":2006,"rating":"PG-13","duration":"98 min","genres":["Action & Adventure","Dramas"],"description":"A tidal wave spells disaster for a ship of New Year's Eve revelers when it capsizes the mammoth vessel, sending passengers into a battle for survival."},{"id":"s172","title":"Same Kind of Different as Me","director":"Michael Carney","country":"United States","year":2017,"rating":"PG-13","duration":"120 min","genres":["Dramas","Faith & Spirituality"],"description":"A wealthy couple whose marriage is on the rocks befriends a local homeless man who changes their perspectives in this inspiring true story."},{"id":"s173","title":"School of Rock","director":"Richard Linklater","country":"United States","year":2003,"rating":"PG-13","duration":"110 min","genres":["Comedies","Music & Musicals"],"description":"Musician Dewey Finn gets a job as a fourth-grade substitute teacher, where he secretly begins teaching his students the finer points of rock n roll."},{"id":"s175","title":"Tears of the Sun","director":"Antoine Fuqua","country":"United States","year":2003,"rating":"R","duration":"121 min","genres":["Action & Adventure","Dramas"],"description":"A Navy SEAL is sent to a war-torn African jungle to rescue a doctor, only to realize he must also save the refugees in the physician's care."},{"id":"s176","title":"The Blue Lagoon","director":"Randal Kleiser","country":"United States","year":1980,"rating":"R","duration":"105 min","genres":["Dramas","Romantic Movies"],"description":"Two shipwrecked children, stranded for years on a deserted island, fall in love as teenagers and attempt to forge a life in the isolated paradise."},{"id":"s178","title":"The Guns of Navarone","director":"J. Lee Thompson","country":"United Kingdom","year":1961,"rating":"TV-14","duration":"156 min","genres":["Action & Adventure","Classic Movies"],"description":"During World War II, British forces launch an attack designed to take out the massive Nazi cannons that guard a critical sea channel."},{"id":"s179","title":"The Interview","director":"Evan Goldberg, Seth Rogen","country":"United States","year":2014,"rating":"R","duration":"112 min","genres":["Action & Adventure","Comedies"],"description":"Seth Rogen and James Franco star in this comedy about two journalists recruited by the CIA after they arrange an interview with Kim Jong-un."},{"id":"s180","title":"The Nutty Professor","director":"Tom Shadyac","country":"United States","year":1996,"rating":"PG-13","duration":"95 min","genres":["Comedies","Romantic Movies"],"description":"After being made fun of for his weight, a kind and brainy professor takes a dose of a revolutionary formula that changes more than just his appearance."},{"id":"s183","title":"Welcome Home Roscoe Jenkins","director":"Malcolm D. Lee","country":"United States","year":2008,"rating":"PG-13","duration":"114 min","genres":["Comedies"],"description":"R.J. travels to Georgia for his parents' 50th anniversary. But after pompously flaunting his Hollywood lifestyle, he must examine what he's become."},{"id":"s184","title":"In the Line of Fire","director":"Wolfgang Petersen","country":"United States","year":1993,"rating":"R","duration":"129 min","genres":["Action & Adventure","Classic Movies"],"description":"A twisted yet ingenious killer torments a veteran Secret Service agent who's haunted by his failure years ago to save President John F. Kennedy."},{"id":"s192","title":"Wind River","director":"Taylor Sheridan","country":"United Kingdom","year":2017,"rating":"R","duration":"107 min","genres":["Dramas","Independent Movies"],"description":"A tracker with the U.S. Fish and Wildlife Service assists a rookie FBI agent who's investigating a teen girl's murder on a remote Wyoming reservation."},{"id":"s197","title":"He's All That","director":"Mark Waters","country":"Unknown","year":2021,"rating":"TV-14","duration":"92 min","genres":["Comedies","Romantic Movies"],"description":"An influencer specializing in makeovers bets she can transform an unpopular classmate into prom king in this remake of the teen classic."},{"id":"s215","title":"SAS: Rise of the Black Swan","director":"Magnus Martens","country":"Unknown","year":2021,"rating":"R","duration":"124 min","genres":["Action & Adventure","International Movies"],"description":"A special forces operative traveling from London to Paris takes action when armed, ruthless mercenaries seize control of their train."},{"id":"s228","title":"Really Love","director":"Angel Kristi Williams","country":"United States","year":2020,"rating":"TV-MA","duration":"95 min","genres":["Dramas","Independent Movies","Romantic Movies"],"description":"A rising Black painter tries to break into a competitive art world while balancing an unexpected romance with an ambitious law student."},{"id":"s229","title":"The November Man","director":"Roger Donaldson","country":"United States","year":2014,"rating":"R","duration":"108 min","genres":["Action & Adventure"],"description":"An ex-CIA agent emerges from retirement to protect an important witness, but he soon discovers that old friends can make the most dangerous enemies."},{"id":"s230","title":"The Old Ways","director":"Christopher Alender","country":"United States","year":2020,"rating":"TV-MA","duration":"90 min","genres":["Horror Movies"],"description":"A reporter visits her birthplace in Veracruz for a story about tribal culture, only to be kidnapped by locals who believe she's demonically possessed."},{"id":"s232","title":"The Water Man","director":"David Oyelowo","country":"United States","year":2021,"rating":"PG","duration":"92 min","genres":["Children & Family Movies","Dramas"],"description":"Desperate to save his ailing mother, 11-year-old Gunner runs away from home on a quest to find a mythic figure rumored to have the power to cheat death."},{"id":"s241","title":"The Witcher: Nightmare of the Wolf","director":"Han Kwang Il","country":"Unknown","year":2021,"rating":"TV-MA","duration":"84 min","genres":["Action & Adventure","Anime Features"],"description":"Escaping from poverty to become a witcher, Vesemir slays monsters for coin and glory, but when a new menace rises, he must face the demons of his past."},{"id":"s247","title":"Man in Love","director":"Yin Chen-hao","country":"Unknown","year":2021,"rating":"TV-MA","duration":"115 min","genres":["Dramas","International Movies","Romantic Movies"],"description":"When he meets a debt-ridden woman who's caring for her ailing father, a debt collector with a heart of gold sets out to win her love."},{"id":"s248","title":"Sweet Girl","director":"Brian Andrew Mendoza","country":"United States","year":2021,"rating":"R","duration":"110 min","genres":["Action & Adventure","Dramas"],"description":"He lost the love of his life to a pharmaceutical company's greed. Now his daughter is without a mother, and he's without justice. For now."},{"id":"s252","title":"Like Crazy","director":"Drake Doremus","country":"United States","year":2011,"rating":"PG-13","duration":"91 min","genres":["Dramas","Independent Movies","Romantic Movies"],"description":"A spirited exchange student and an American man fall in love in LA. But their romance faces an uphill battle when she is forced to return to England."},{"id":"s268","title":"The Piano","director":"Jane Campion","country":"New Zealand","year":1993,"rating":"R","duration":"121 min","genres":["Classic Movies","Dramas","Independent Movies"],"description":"With her daughter and her beloved piano in tow, a mute Scottish woman arrives in New Zealand, where a gruff loner sets out to seduce her."},{"id":"s271","title":"Beckett","director":"Ferdinando Cito Filomarino","country":"Italy","year":2021,"rating":"TV-MA","duration":"110 min","genres":["Action & Adventure"],"description":"An American tourist goes on the run in Greece after a tragic accident plunges him into a political conspiracy that makes him a target for assassination."},{"id":"s285","title":"The Kissing Booth 3","director":"Vince Marcello","country":"United Kingdom","year":2021,"rating":"TV-14","duration":"114 min","genres":["Comedies","Romantic Movies"],"description":"Determined to make the most of her final summer before college, Elle plans the ultimate bucket list as she navigates what comes next with Noah and Lee."},{"id":"s291","title":"Untold: Malice at the Palace","director":"Floyd Russ","country":"United States","year":2021,"rating":"TV-MA","duration":"70 min","genres":["Documentaries","Sports Movies"],"description":"Key figures from an infamous 2004 incident between players and fans at an NBA game in Michigan discuss the fight, its fallout and its lasting legacy."},{"id":"s293","title":"Quartet","director":"Dustin Hoffman","country":"United Kingdom","year":2012,"rating":"PG-13","duration":"98 min","genres":["Comedies","Dramas","Independent Movies"],"description":"To save their posh retirement home, former opera stars plan a gala recital — until the biggest diva among them refuses to sing."},{"id":"s296","title":"The Paper Tigers","director":"Quoc Bao Tran","country":"United States","year":2021,"rating":"PG-13","duration":"111 min","genres":["Action & Adventure","Comedies"],"description":"After reuniting as middle-aged men, three kung-fu prodigies must set their differences aside and dust off their skills to avenge their beloved mentor."},{"id":"s301","title":"Vivo","director":"Kirk DeMicco","country":"Canada","year":2021,"rating":"PG","duration":"100 min","genres":["Children & Family Movies","Music & Musicals"],"description":"A music-loving kinkajou embarks on the journey of a lifetime to fulfill his destiny and deliver a love song for an old friend."},{"id":"s302","title":"Chennai Express","director":"Rohit Shetty","country":"India","year":2013,"rating":"TV-14","duration":"135 min","genres":["Action & Adventure","Comedies","International Movies"],"description":"What could have been a sad journey turns joyful for Rahul when he falls in love with a woman en route to submerging his grandfather's ashes."},{"id":"s308","title":"Aftermath","director":"Peter Winther","country":"United States","year":2021,"rating":"TV-MA","duration":"115 min","genres":["Horror Movies"],"description":"Desperate to save their marriage, a young couple takes a deal and moves into their dream home, but disturbing events reveal the house's troubled history."},{"id":"s315","title":"Heavy","director":"James Mangold","country":"United States","year":1995,"rating":"R","duration":"104 min","genres":["Dramas","Independent Movies","Romantic Movies"],"description":"Overweight Victor hides from the world making pizzas in his mother's gloomy dive until a new waitress blows in and disrupts his isolation."}];
+
+// ── TF-IDF ENGINE (in JS) ──────────────────────────────────────────────
+function tokenize(text) {
+  const stop = new Set(['a','an','the','and','or','of','in','to','is','was','are','he','she','they','his','her','their','this','that','with','for','as','on','at','by','from','it','its','be','been','have','had','who','but','up','out','when','after','when','into','what','how','which']);
+  return text.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w => w.length > 2 && !stop.has(w));
+}
+
+function buildSoup(movie) {
+  const genres = movie.genres.join(' ').toLowerCase().replace(/[^a-z ]/g,' ');
+  const desc = movie.description.toLowerCase();
+  return `${genres} ${genres} ${desc}`;
+}
+
+function computeTFIDF(docs) {
+  const N = docs.length;
+  const tokenized = docs.map(tokenize);
+  const df = {};
+  tokenized.forEach(tokens => {
+    const seen = new Set(tokens);
+    seen.forEach(t => { df[t] = (df[t] || 0) + 1; });
+  });
+  const vocab = Object.keys(df).filter(t => df[t] >= 2 && df[t] < N * 0.85);
+  const vidx = {};
+  vocab.forEach((t, i) => vidx[t] = i);
+  const V = vocab.length;
+  const matrix = tokenized.map(tokens => {
+    const tf = {};
+    tokens.forEach(t => { if (vidx[t] !== undefined) tf[t] = (tf[t] || 0) + 1; });
+    const total = tokens.length || 1;
+    const vec = new Float32Array(V);
+    Object.keys(tf).forEach(t => {
+      const i = vidx[t];
+      if (i !== undefined) vec[i] = (tf[t] / total) * Math.log(N / (df[t] + 1));
+    });
+    // L2 normalize
+    let norm = 0;
+    for (let i = 0; i < V; i++) norm += vec[i] * vec[i];
+    norm = Math.sqrt(norm) || 1;
+    for (let i = 0; i < V; i++) vec[i] /= norm;
+    return vec;
+  });
+  return matrix;
+}
+
+function cosineSim(a, b) {
+  let dot = 0;
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+  return dot;
+}
+
+// Pre-compute
+const soups = MOVIES.map(buildSoup);
+const tfidfMatrix = computeTFIDF(soups);
+
+// ── CHARTS ────────────────────────────────────────────────────────────
+const chartDefaults = { color: '#999', borderColor: 'rgba(255,255,255,0.08)', grid: { color: 'rgba(255,255,255,0.06)' } };
+
+function mkChart(id, config) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  return new Chart(el, config);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Type donut
+  mkChart('typeChart', { type: 'doughnut', data: {
+    labels: ['Movies','TV Shows'],
+    datasets: [{ data: [6131, 2676], backgroundColor: ['#E50914','#444'], borderWidth: 0 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 12 } } } } } });
+
+  // Year bar
+  const years = ['2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021'];
+  const yCounts = [194,185,237,288,352,560,902,1032,1147,1030,953,592];
+  mkChart('yearChart', { type: 'bar', data: {
+    labels: years,
+    datasets: [{ data: yCounts, backgroundColor: '#E50914', borderRadius: 3 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', font: { size: 10 } }, grid: chartDefaults.grid }, y: { ticks: { color: '#888' }, grid: chartDefaults.grid } } } });
+
+  // Rating bar
+  const ratings = ['TV-MA','TV-14','TV-PG','R','PG-13','TV-Y7','TV-Y','PG'];
+  const rCounts = [3207,2160,863,799,490,334,307,287];
+  mkChart('ratingChart', { type: 'bar', data: {
+    labels: ratings,
+    datasets: [{ data: rCounts, backgroundColor: ['#E50914','#c40810','#a00009','#880006','#7a0005','#660004','#550003','#440002'], borderRadius: 3 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', font: { size: 10 } }, grid: chartDefaults.grid }, y: { ticks: { color: '#888' }, grid: chartDefaults.grid } } } });
+
+  // Genre horizontal bar
+  const genres = ['International Movies','Dramas','Comedies','International TV Shows','Documentaries','Action & Adventure','TV Dramas','Independent Movies','Children & Family','Romantic Movies'];
+  const gCounts = [2752,2427,1674,1351,869,859,763,756,641,616];
+  mkChart('genreChart', { type: 'bar', data: {
+    labels: genres,
+    datasets: [{ data: gCounts, backgroundColor: '#E50914', borderRadius: 3 }]
+  }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', font: { size: 10 } }, grid: chartDefaults.grid }, y: { ticks: { color: '#888', font: { size: 10 } }, grid: { display: false } } } } });
+
+  // EDA genre
+  mkChart('edaGenreChart', { type: 'bar', data: {
+    labels: ['International Movies','Dramas','Comedies','Intl TV Shows','Documentaries','Action & Adventure','TV Dramas','Independent','Children & Family','Romantic Movies','TV Comedies','Thrillers','Crime TV','Kids TV','Docuseries'],
+    datasets: [{ data: [2752,2427,1674,1351,869,859,763,756,641,616,581,577,470,451,395], backgroundColor: '#E50914', borderRadius: 3 }]
+  }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: chartDefaults.grid }, y: { ticks: { color: '#888', font: { size: 11 } }, grid: { display: false } } } } });
+
+  // EDA year
+  mkChart('edaYearChart', { type: 'line', data: {
+    labels: years,
+    datasets: [{ data: yCounts, borderColor: '#E50914', backgroundColor: 'rgba(229,9,20,0.1)', fill: true, tension: 0.4, pointBackgroundColor: '#E50914', pointRadius: 4 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: chartDefaults.grid }, y: { ticks: { color: '#888' }, grid: chartDefaults.grid } } } });
+
+  // EDA rating
+  mkChart('edaRatingChart', { type: 'pie', data: {
+    labels: ratings,
+    datasets: [{ data: rCounts, backgroundColor: ['#E50914','#c40810','#a00009','#880006','#7a0005','#660004','#550003','#440002'], borderWidth: 0 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#888', font: { size: 11 } }, position: 'right' } } } });
+
+  // EDA rating by type (movies vs tv show - approximation)
+  mkChart('edaRatingTypeChart', { type: 'bar', data: {
+    labels: ['TV-MA','TV-14','TV-PG','R','PG-13','PG'],
+    datasets: [
+      { label: 'Movies', data: [1200,900,350,799,490,287], backgroundColor: '#E50914' },
+      { label: 'TV Shows', data: [2007,1260,513,0,0,0], backgroundColor: '#444' }
+    ]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#888', font: { size: 11 } } } }, scales: { x: { ticks: { color: '#888', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#888' }, grid: chartDefaults.grid }, } } });
+
+  // EDA null chart
+  mkChart('edaNullChart', { type: 'bar', data: {
+    labels: ['director','country','cast','date_added','rating','duration','description','title'],
+    datasets: [{ data: [2634,831,825,10,4,3,3,0], backgroundColor: data => data.dataIndex === 0 ? '#E50914' : '#555', borderRadius: 3 }]
+  }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#888' }, grid: chartDefaults.grid } } } });
+
+  // Populate select
+  const sel = document.getElementById('movieSelect');
+  MOVIES.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${m.title} (${m.year})`;
+    sel.appendChild(opt);
+  });
+
+  // Populate genre filter
+  const allGenres = new Set();
+  MOVIES.forEach(m => m.genres.forEach(g => allGenres.add(g)));
+  const gSel = document.getElementById('filterGenre');
+  [...allGenres].sort().forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g;
+    gSel.appendChild(opt);
+  });
+});
+
+// ── RECOMMENDATION LOGIC ──────────────────────────────────────────────
+let lastResults = [];
+
+function recommend() {
+  const sel = document.getElementById('movieSelect');
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) return;
+  const movie = MOVIES[idx];
+
+  // Show selected movie
+  document.getElementById('selectedInfo').style.display = 'block';
+  document.getElementById('selectedInfo').innerHTML = `
+    <div class="selected-movie">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <h3>${movie.title}</h3>
+          <div class="meta">${movie.year} · ${movie.rating} · ${movie.duration} · ${movie.country}</div>
+          <div class="desc">${movie.description}</div>
+        </div>
+        <span class="badge" style="white-space:nowrap;margin-left:16px">Querying...</span>
+      </div>
+      <div class="movie-card genres" style="background:none;border:none;padding:8px 0 0">
+        ${movie.genres.map(g => `<span class="genre-tag">${g}</span>`).join('')}
+      </div>
+    </div>`;
+
+  // Compute similarities
+  const vec = tfidfMatrix[idx];
+  const scores = MOVIES.map((m, i) => {
+    if (i === idx) return { movie: m, score: -1, i };
+    return { movie: m, score: cosineSim(vec, tfidfMatrix[i]), i };
+  }).sort((a, b) => b.score - a.score);
+
+  lastResults = scores.slice(1);
+  document.querySelector('.selected-movie .badge').textContent = `Found ${lastResults.length} matches`;
+  applyFilters();
+}
+
+function applyFilters() {
+  const rating = document.getElementById('filterRating').value;
+  const genre = document.getElementById('filterGenre').value;
+  const year = parseInt(document.getElementById('filterYear').value) || 0;
+  const n = parseInt(document.getElementById('filterN').value) || 12;
+
+  if (!lastResults.length) return;
+
+  let filtered = lastResults.filter(r => {
+    if (rating && r.movie.rating !== rating) return false;
+    if (genre && !r.movie.genres.includes(genre)) return false;
+    if (year && r.movie.year < year) return false;
+    return true;
+  }).slice(0, n);
+
+  const area = document.getElementById('resultsArea');
+  if (!filtered.length) {
+    area.innerHTML = '<div class="empty"><div class="icon">🔍</div><div>No results match your filters</div></div>';
+    return;
+  }
+
+  area.innerHTML = `<h2 style="margin-bottom:16px;font-size:16px;color:var(--muted)">Top ${filtered.length} recommendations</h2><div class="results-grid">${filtered.map((r, i) => `
+    <div class="movie-card">
+      <div class="rank">#${i+1} MATCH</div>
+      <div class="title">${r.movie.title}</div>
+      <div class="meta">${r.movie.year} · ${r.movie.rating} · ${r.movie.duration}</div>
+      <div class="desc">${r.movie.description}</div>
+      <div class="genres">${r.movie.genres.map(g => `<span class="genre-tag">${g}</span>`).join('')}</div>
+      <div class="score">Similarity: ${Math.round(r.score * 100)}%</div>
+    </div>`).join('')}</div>`;
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showCode(n) {
+  document.querySelectorAll('.code-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('cp'+n).classList.add('active');
+  document.querySelectorAll('.step-tab')[n].classList.add('active');
+}
+</script>
+</body>
+</html>
