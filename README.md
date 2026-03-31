@@ -129,3 +129,6 @@ Key insights derived from the dataset:
 ## Conclusion  
 
 This project demonstrates how machine learning and NLP techniques can be used to build scalable recommendation systems. By combining data analysis, feature engineering, and interactive visualization, the system provides meaningful and efficient movie recommendations.
+
+Live Deployment:
+https://salmali-chattopadhyay.github.io/Netflix_Reccomendation_System/
