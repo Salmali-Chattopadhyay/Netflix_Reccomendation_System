@@ -80,7 +80,7 @@ Key insights derived from the dataset:
 
 ## Tech Stack  
 
-- **Frontend:** HTML, CSS, JavaScript  
+- **Frontend:** HTML5, CSS3, JavaScript  
 - **Visualization:** Chart.js  
 - **Backend Logic:** Python (Google Colab)  
 - **Machine Learning / NLP:**  
